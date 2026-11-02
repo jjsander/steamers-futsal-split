@@ -55,6 +55,8 @@
   li.saving { opacity: .6; }
   .keep { margin-top: 10px; appearance: none; border: 1px solid var(--line); background: transparent; color: var(--ink);
     font: 500 13px Inter, sans-serif; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+  .seg button.wide { width: 84px; }
+  .legend { font-size: 13px; color: var(--muted); margin: -4px 0 8px; }
   .keep:disabled { opacity: .5; cursor: default; }
   .msg { max-width: 720px; margin: 40px auto; padding: 0 16px; color: var(--muted); }
   .msg strong { color: var(--ink); }
@@ -80,7 +82,11 @@ const token = new URLSearchParams(location.search).get("c") || "";
 const app = document.getElementById("app");
 const intro = document.getElementById("intro");
 const toast = document.getElementById("toast");
-const OPTIONS = [["1", "Team 1", "b1", "1"], ["2", "Team 2", "b2", "2"], ["both", "Both teams", "bboth", "Both"], ["out", "Out", "bout", "Out"]];
+function optionsFor(team) {
+  return team.mode === "single"
+    ? [["1", "Playing futsal", "b1 wide", "Playing"], ["out", "Not playing futsal", "bout wide", "Out"]]
+    : [["1", team.label1, "b1", "1"], ["2", team.label2, "b2", "2"], ["both", "Both teams", "bboth", "Both"], ["out", "Not playing futsal", "bout", "Out"]];
+}
 
 function showError(text) {
   toast.textContent = text; toast.style.display = "block";
@@ -96,13 +102,14 @@ function el(tag, attrs = {}, ...kids) {
 function renderTally(team, box) {
   const c = { "1": 0, "2": 0, both: 0, out: 0, none: 0 };
   team.players.forEach(p => c[p.side || "none"]++);
-  box.replaceChildren(
-    el("span", { class: "pill p1" }, `Team 1: ${c["1"]}`),
-    el("span", { class: "pill p2" }, `Team 2: ${c["2"]}`),
-    el("span", { class: "pill pboth" }, `Both: ${c.both}`),
-    el("span", { class: "pill pout" }, `Out: ${c.out}`),
-    c.none ? el("span", { class: "pill pleft" }, `${c.none} left`) : el("span", { class: "pill pdone" }, "✓ All set")
-  );
+  const pills = team.mode === "single"
+    ? [el("span", { class: "pill p1" }, `Playing: ${c["1"]}`)]
+    : [el("span", { class: "pill p1" }, `${team.label1}: ${c["1"]}`),
+       el("span", { class: "pill p2" }, `${team.label2}: ${c["2"]}`),
+       el("span", { class: "pill pboth" }, `Both: ${c.both}`)];
+  pills.push(el("span", { class: "pill pout" }, `Out: ${c.out}`),
+    c.none ? el("span", { class: "pill pleft" }, `${c.none} left`) : el("span", { class: "pill pdone" }, "✓ All set"));
+  box.replaceChildren(...pills);
 }
 
 async function setSide(team, player, side, li, tallyBox) {
@@ -127,23 +134,23 @@ function paint(li, player) {
 
 function render(data) {
   const first = data.coach.split(" ")[0];
-  intro.textContent = `Hi ${first}. For each player, tap 1 or 2 for their futsal team, Both if they'll play on both, or Out if they won't play futsal. If your team is staying together for futsal, use the "Not splitting" button to put everyone on Team 1. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
+  intro.textContent = `Hi ${first}. For teams that are splitting, tap 1 or 2 to put each player on a futsal team, Both if they'll play on both, or Out if they won't play futsal. For teams playing as one, mark each player Playing or Out. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
   if (!data.teams.length) { app.replaceChildren(el("p", { class: "msg" }, "No players are assigned to your teams yet.")); return; }
   app.replaceChildren(...data.teams.map(team => {
     const tally = el("div", { class: "tally" });
     const list = el("ul");
     const rows = new Map();
-    const keep = el("button", { type: "button", class: "keep" }, "Not splitting? Put everyone on Team 1");
+    const keep = el("button", { type: "button", class: "keep" }, "Mark everyone as playing");
     keep.addEventListener("click", async () => {
       keep.disabled = true;
-      await Promise.all(team.players.filter(p => p.side !== "1" && p.side !== "out")
+      await Promise.all(team.players.filter(p => !p.side)
         .map(p => setSide(team, p, "1", rows.get(p.player_id), tally)));
       keep.disabled = false;
     });
     team.players.forEach(p => {
       const seg = el("div", { class: "seg", role: "group", "aria-label": `Futsal team for ${p.first} ${p.last}` });
       const li = el("li", {}, el("span", { class: "name" }, `${p.first} ${p.last}`), seg);
-      OPTIONS.forEach(([side, label, cls, text]) => {
+      optionsFor(team).forEach(([side, label, cls, text]) => {
         const b = el("button", { type: "button", class: cls, "data-side": side, "aria-pressed": "false" }, text);
         b.title = label; b.setAttribute("aria-label", label);
         b.addEventListener("click", () => setSide(team, p, side, li, tally));
@@ -153,7 +160,11 @@ function render(data) {
     });
     renderTally(team, tally);
     return el("section", { class: "team" },
-      el("div", { class: "team-head" }, el("h2", { class: "team-name" }, team.name.replace(/^Steamer.s Crew /, "")), tally, keep), list);
+      el("div", { class: "team-head" }, el("h2", { class: "team-name" }, team.name.replace(/^Steamer.s Crew /, "")),
+        el("div", { class: "legend" }, team.mode === "single"
+          ? "Playing futsal as one team. Mark anyone who won't play as Out."
+          : `Splitting into two futsal teams: 1 = ${team.label1} · 2 = ${team.label2}`),
+        tally, ...(team.mode === "single" ? [keep] : [])), list);
   }));
 }
 

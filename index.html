@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Futsal Roster Split</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f5f2; --card: #ffffff; --ink: #14202b; --muted: #5f6b75; --line: #dfe3e0;
+    --t1: #1f5fae; --t1-soft: #e3edf9; --t2: #c2571a; --t2-soft: #fbeadf;
+    --out: #6b7280; --out-soft: #eceef0; --ok: #2f7d4f; --ok-soft: #e2f3e8; --err: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10161c; --card: #18212a; --ink: #e8edf1; --muted: #9aa6b0; --line: #2a3540;
+      --t1: #6ea4e8; --t1-soft: #1d2f45; --t2: #f0915a; --t2-soft: #3d2618;
+      --out: #9aa3ad; --out-soft: #262f38; --ok: #5fc48a; --ok-soft: #173326; --err: #f97066;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Inter, system-ui, sans-serif; }
+  header { padding: 28px 16px 8px; max-width: 720px; margin: 0 auto; }
+  .kicker { font: 700 13px/1 "Barlow Condensed", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font: 700 34px/1.05 "Barlow Condensed", sans-serif; margin: 6px 0 10px; text-transform: uppercase; }
+  .intro { color: var(--muted); margin: 0 0 4px; }
+  main { max-width: 720px; margin: 0 auto; padding: 8px 16px 64px; }
+  .team { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin: 18px 0; overflow: hidden; }
+  .team-head { padding: 14px 16px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); z-index: 2; }
+  .team-name { font: 700 22px/1.1 "Barlow Condensed", sans-serif; margin: 0 0 8px; }
+  .tally { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+  .pill { padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+  .p1 { background: var(--t1-soft); color: var(--t1); }
+  .p2 { background: var(--t2-soft); color: var(--t2); }
+  .pout { background: var(--out-soft); color: var(--out); }
+  .pleft { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+  .pdone { background: var(--ok-soft); color: var(--ok); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: 0; }
+  .name { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+  .name.unset::after { content: "•"; color: var(--t2); margin-left: 6px; }
+  .seg { display: flex; flex-shrink: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: 600 14px Inter, sans-serif;
+    padding: 9px 0; width: 64px; cursor: pointer; border-left: 1px solid var(--line); }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"].b1 { background: var(--t1); color: #fff; }
+  .seg button[aria-pressed="true"].b2 { background: var(--t2); color: #fff; }
+  .seg button[aria-pressed="true"].bout { background: var(--out); color: #fff; }
+  .seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+  li.saving { opacity: .6; }
+  .msg { max-width: 720px; margin: 40px auto; padding: 0 16px; color: var(--muted); }
+  .msg strong { color: var(--ink); }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--err); color: #fff;
+    padding: 10px 16px; border-radius: 10px; font-weight: 500; display: none; max-width: calc(100% - 32px); }
+  footer { color: var(--muted); font-size: 13px; text-align: center; padding: 8px 16px 32px; }
+  @media (max-width: 420px) { .seg button { width: 54px; } h1 { font-size: 30px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">Steamer's Crew SC · Futsal</div>
+  <h1>Split your roster</h1>
+  <p class="intro" id="intro">Loading your team…</p>
+</header>
+<main id="app"></main>
+<div id="toast" role="alert"></div>
+<footer>Changes save automatically. Questions? Reply to the email you got this link from.</footer>
+
+<script>
+const API = "https://mjlujebccqcrfoasjzxv.supabase.co/functions/v1/futsal-split";
+const token = new URLSearchParams(location.search).get("c") || "";
+const app = document.getElementById("app");
+const intro = document.getElementById("intro");
+const toast = document.getElementById("toast");
+const OPTIONS = [["1", "Team 1", "b1"], ["2", "Team 2", "b2"], ["out", "Out", "bout"]];
+
+function showError(text) {
+  toast.textContent = text; toast.style.display = "block";
+  clearTimeout(showError.t); showError.t = setTimeout(() => toast.style.display = "none", 4000);
+}
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) k === "class" ? n.className = v : n.setAttribute(k, v);
+  for (const k of kids) n.append(k);
+  return n;
+}
+
+function renderTally(team, box) {
+  const c = { "1": 0, "2": 0, out: 0, none: 0 };
+  team.players.forEach(p => c[p.side || "none"]++);
+  box.replaceChildren(
+    el("span", { class: "pill p1" }, `Team 1: ${c["1"]}`),
+    el("span", { class: "pill p2" }, `Team 2: ${c["2"]}`),
+    el("span", { class: "pill pout" }, `Out: ${c.out}`),
+    c.none ? el("span", { class: "pill pleft" }, `${c.none} left`) : el("span", { class: "pill pdone" }, "✓ All set")
+  );
+}
+
+async function setSide(team, player, side, li, tallyBox) {
+  const prev = player.side;
+  const next = prev === side ? null : side;          // tap the selected option again to clear it
+  player.side = next; paint(li, player); renderTally(team, tallyBox);
+  li.classList.add("saving");
+  try {
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ c: token, player_id: player.player_id, team_id: team.team_id, side: next }) });
+    if (!r.ok) throw new Error();
+  } catch {
+    player.side = prev; paint(li, player); renderTally(team, tallyBox);
+    showError(`Couldn't save ${player.first}. Check your connection and tap again.`);
+  } finally { li.classList.remove("saving"); }
+}
+
+function paint(li, player) {
+  li.querySelector(".name").classList.toggle("unset", !player.side);
+  li.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.side === player.side)));
+}
+
+function render(data) {
+  const first = data.coach.split(" ")[0];
+  intro.textContent = `Hi ${first}. For each player, tap Team 1 or Team 2 for futsal games, or Out if they won't play futsal. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
+  if (!data.teams.length) { app.replaceChildren(el("p", { class: "msg" }, "No players are assigned to your teams yet.")); return; }
+  app.replaceChildren(...data.teams.map(team => {
+    const tally = el("div", { class: "tally" });
+    const list = el("ul");
+    team.players.forEach(p => {
+      const seg = el("div", { class: "seg", role: "group", "aria-label": `Futsal team for ${p.first} ${p.last}` });
+      const li = el("li", {}, el("span", { class: "name" }, `${p.first} ${p.last}`), seg);
+      OPTIONS.forEach(([side, label, cls]) => {
+        const b = el("button", { type: "button", class: cls, "data-side": side, "aria-pressed": "false" }, side === "out" ? "Out" : side === "1" ? "1" : "2");
+        b.title = label; b.setAttribute("aria-label", label);
+        b.addEventListener("click", () => setSide(team, p, side, li, tally));
+        seg.append(b);
+      });
+      paint(li, p); list.append(li);
+    });
+    renderTally(team, tally);
+    return el("section", { class: "team" },
+      el("div", { class: "team-head" }, el("h2", { class: "team-name" }, team.name.replace(/^Steamer.s Crew /, "")), tally), list);
+  }));
+}
+
+(async () => {
+  if (!token) { intro.textContent = ""; app.innerHTML = '<p class="msg"><strong>This link is missing its code.</strong> Use the personal link from your email.</p>'; return; }
+  try {
+    const r = await fetch(`${API}?c=${encodeURIComponent(token)}`);
+    if (r.status === 404) { intro.textContent = ""; app.innerHTML = '<p class="msg"><strong>We couldn\'t find your roster.</strong> Make sure you used the full link from your email.</p>'; return; }
+    if (!r.ok) throw new Error();
+    render(await r.json());
+  } catch {
+    intro.textContent = ""; app.innerHTML = '<p class="msg"><strong>Something went wrong loading your roster.</strong> Refresh the page to try again.</p>';
+  }
+})();
+</script>
+</body>
+</html>

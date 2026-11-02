@@ -83,9 +83,7 @@ const app = document.getElementById("app");
 const intro = document.getElementById("intro");
 const toast = document.getElementById("toast");
 function optionsFor(team) {
-  return team.mode === "single"
-    ? [["1", "Playing futsal", "b1 wide", "Playing"], ["out", "Not playing futsal", "bout wide", "Out"]]
-    : [["1", team.label1, "b1", "1"], ["2", team.label2, "b2", "2"], ["both", "Both teams", "bboth", "Both"], ["out", "Not playing futsal", "bout", "Out"]];
+  return [["1", "Team 1", "b1", "1"], ["2", "Team 2", "b2", "2"], ["both", "Both teams", "bboth", "Both"], ["out", "Not playing futsal", "bout", "Out"]];
 }
 
 function showError(text) {
@@ -102,10 +100,9 @@ function el(tag, attrs = {}, ...kids) {
 function renderTally(team, box) {
   const c = { "1": 0, "2": 0, both: 0, out: 0, none: 0 };
   team.players.forEach(p => c[p.side || "none"]++);
-  const pills = team.mode === "single"
-    ? [el("span", { class: "pill p1" }, `Playing: ${c["1"]}`)]
-    : [el("span", { class: "pill p1" }, `${team.label1}: ${c["1"]}`),
-       el("span", { class: "pill p2" }, `${team.label2}: ${c["2"]}`),
+  const split = team.mode !== "single";
+  const pills = [el("span", { class: "pill p1" }, `${split ? team.label1 : "Team 1"}: ${c["1"]}`),
+       el("span", { class: "pill p2" }, `${split ? team.label2 : "Team 2"}: ${c["2"]}`),
        el("span", { class: "pill pboth" }, `Both: ${c.both}`)];
   pills.push(el("span", { class: "pill pout" }, `Out: ${c.out}`),
     c.none ? el("span", { class: "pill pleft" }, `${c.none} left`) : el("span", { class: "pill pdone" }, "✓ All set"));
@@ -134,13 +131,13 @@ function paint(li, player) {
 
 function render(data) {
   const first = data.coach.split(" ")[0];
-  intro.textContent = `Hi ${first}. For teams that are splitting, tap 1 or 2 to put each player on a futsal team, Both if they'll play on both, or Out if they won't play futsal. For teams playing as one, mark each player Playing or Out. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
+  intro.textContent = `Hi ${first}. For each player, tap 1 or 2 to put them on a futsal team, Both if they'll play on both, or Out if they won't play futsal. Each team's header tells you whether it's splitting into two futsal teams or playing as one. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
   if (!data.teams.length) { app.replaceChildren(el("p", { class: "msg" }, "No players are assigned to your teams yet.")); return; }
   app.replaceChildren(...data.teams.map(team => {
     const tally = el("div", { class: "tally" });
     const list = el("ul");
     const rows = new Map();
-    const keep = el("button", { type: "button", class: "keep" }, "Mark everyone as playing");
+    const keep = el("button", { type: "button", class: "keep" }, "Put everyone on Team 1");
     keep.addEventListener("click", async () => {
       keep.disabled = true;
       await Promise.all(team.players.filter(p => !p.side)
@@ -162,7 +159,7 @@ function render(data) {
     return el("section", { class: "team" },
       el("div", { class: "team-head" }, el("h2", { class: "team-name" }, team.name.replace(/^Steamer.s Crew /, "")),
         el("div", { class: "legend" }, team.mode === "single"
-          ? "Playing futsal as one team. Mark anyone who won't play as Out."
+          ? "This team is playing futsal as one team, so select Team 1 (1) for every player, or Out for anyone who won't play."
           : `Splitting into two futsal teams: 1 = ${team.label1} · 2 = ${team.label2}`),
         tally, ...(team.mode === "single" ? [keep] : [])), list);
   }));

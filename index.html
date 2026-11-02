@@ -51,6 +51,9 @@
   .seg button[aria-pressed="true"].bout { background: var(--out); color: #fff; }
   .seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   li.saving { opacity: .6; }
+  .keep { margin-top: 10px; appearance: none; border: 1px solid var(--line); background: transparent; color: var(--ink);
+    font: 500 13px Inter, sans-serif; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+  .keep:disabled { opacity: .5; cursor: default; }
   .msg { max-width: 720px; margin: 40px auto; padding: 0 16px; color: var(--muted); }
   .msg strong { color: var(--ink); }
   #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--err); color: #fff;
@@ -121,11 +124,19 @@ function paint(li, player) {
 
 function render(data) {
   const first = data.coach.split(" ")[0];
-  intro.textContent = `Hi ${first}. For each player, tap Team 1 or Team 2 for futsal games, or Out if they won't play futsal. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
+  intro.textContent = `Hi ${first}. For each player, tap Team 1 or Team 2 for futsal games, or Out if they won't play futsal. If your team is staying together for futsal, use the "Not splitting" button to put everyone on Team 1. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
   if (!data.teams.length) { app.replaceChildren(el("p", { class: "msg" }, "No players are assigned to your teams yet.")); return; }
   app.replaceChildren(...data.teams.map(team => {
     const tally = el("div", { class: "tally" });
     const list = el("ul");
+    const rows = new Map();
+    const keep = el("button", { type: "button", class: "keep" }, "Not splitting? Put everyone on Team 1");
+    keep.addEventListener("click", async () => {
+      keep.disabled = true;
+      await Promise.all(team.players.filter(p => p.side !== "1" && p.side !== "out")
+        .map(p => setSide(team, p, "1", rows.get(p.player_id), tally)));
+      keep.disabled = false;
+    });
     team.players.forEach(p => {
       const seg = el("div", { class: "seg", role: "group", "aria-label": `Futsal team for ${p.first} ${p.last}` });
       const li = el("li", {}, el("span", { class: "name" }, `${p.first} ${p.last}`), seg);
@@ -135,11 +146,11 @@ function render(data) {
         b.addEventListener("click", () => setSide(team, p, side, li, tally));
         seg.append(b);
       });
-      paint(li, p); list.append(li);
+      paint(li, p); list.append(li); rows.set(p.player_id, li);
     });
     renderTally(team, tally);
     return el("section", { class: "team" },
-      el("div", { class: "team-head" }, el("h2", { class: "team-name" }, team.name.replace(/^Steamer.s Crew /, "")), tally), list);
+      el("div", { class: "team-head" }, el("h2", { class: "team-name" }, team.name.replace(/^Steamer.s Crew /, "")), tally, keep), list);
   }));
 }
 

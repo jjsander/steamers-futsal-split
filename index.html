@@ -11,13 +11,13 @@
   :root {
     --bg: #f4f5f2; --card: #ffffff; --ink: #14202b; --muted: #5f6b75; --line: #dfe3e0;
     --t1: #1f5fae; --t1-soft: #e3edf9; --t2: #c2571a; --t2-soft: #fbeadf;
-    --out: #6b7280; --out-soft: #eceef0; --ok: #2f7d4f; --ok-soft: #e2f3e8; --err: #b42318;
+    --out: #6b7280; --out-soft: #eceef0; --both: #6b3fa0; --both-soft: #efe7f8; --ok: #2f7d4f; --ok-soft: #e2f3e8; --err: #b42318;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #10161c; --card: #18212a; --ink: #e8edf1; --muted: #9aa6b0; --line: #2a3540;
       --t1: #6ea4e8; --t1-soft: #1d2f45; --t2: #f0915a; --t2-soft: #3d2618;
-      --out: #9aa3ad; --out-soft: #262f38; --ok: #5fc48a; --ok-soft: #173326; --err: #f97066;
+      --out: #9aa3ad; --out-soft: #262f38; --both: #b48ee6; --both-soft: #2e2240; --ok: #5fc48a; --ok-soft: #173326; --err: #f97066;
     }
   }
   * { box-sizing: border-box; }
@@ -35,6 +35,7 @@
   .p1 { background: var(--t1-soft); color: var(--t1); }
   .p2 { background: var(--t2-soft); color: var(--t2); }
   .pout { background: var(--out-soft); color: var(--out); }
+  .pboth { background: var(--both-soft); color: var(--both); }
   .pleft { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
   .pdone { background: var(--ok-soft); color: var(--ok); }
   ul { list-style: none; margin: 0; padding: 0; }
@@ -44,10 +45,11 @@
   .name.unset::after { content: "•"; color: var(--t2); margin-left: 6px; }
   .seg { display: flex; flex-shrink: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: 600 14px Inter, sans-serif;
-    padding: 9px 0; width: 64px; cursor: pointer; border-left: 1px solid var(--line); }
+    padding: 9px 0; width: 56px; cursor: pointer; border-left: 1px solid var(--line); }
   .seg button:first-child { border-left: 0; }
   .seg button[aria-pressed="true"].b1 { background: var(--t1); color: #fff; }
   .seg button[aria-pressed="true"].b2 { background: var(--t2); color: #fff; }
+  .seg button[aria-pressed="true"].bboth { background: var(--both); color: #fff; }
   .seg button[aria-pressed="true"].bout { background: var(--out); color: #fff; }
   .seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   li.saving { opacity: .6; }
@@ -59,7 +61,7 @@
   #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--err); color: #fff;
     padding: 10px 16px; border-radius: 10px; font-weight: 500; display: none; max-width: calc(100% - 32px); }
   footer { color: var(--muted); font-size: 13px; text-align: center; padding: 8px 16px 32px; }
-  @media (max-width: 420px) { .seg button { width: 54px; } h1 { font-size: 30px; } }
+  @media (max-width: 420px) { .seg button { width: 46px; font-size: 13px; } h1 { font-size: 30px; } }
 </style>
 </head>
 <body>
@@ -78,7 +80,7 @@ const token = new URLSearchParams(location.search).get("c") || "";
 const app = document.getElementById("app");
 const intro = document.getElementById("intro");
 const toast = document.getElementById("toast");
-const OPTIONS = [["1", "Team 1", "b1"], ["2", "Team 2", "b2"], ["out", "Out", "bout"]];
+const OPTIONS = [["1", "Team 1", "b1", "1"], ["2", "Team 2", "b2", "2"], ["both", "Both teams", "bboth", "Both"], ["out", "Out", "bout", "Out"]];
 
 function showError(text) {
   toast.textContent = text; toast.style.display = "block";
@@ -92,11 +94,12 @@ function el(tag, attrs = {}, ...kids) {
 }
 
 function renderTally(team, box) {
-  const c = { "1": 0, "2": 0, out: 0, none: 0 };
+  const c = { "1": 0, "2": 0, both: 0, out: 0, none: 0 };
   team.players.forEach(p => c[p.side || "none"]++);
   box.replaceChildren(
     el("span", { class: "pill p1" }, `Team 1: ${c["1"]}`),
     el("span", { class: "pill p2" }, `Team 2: ${c["2"]}`),
+    el("span", { class: "pill pboth" }, `Both: ${c.both}`),
     el("span", { class: "pill pout" }, `Out: ${c.out}`),
     c.none ? el("span", { class: "pill pleft" }, `${c.none} left`) : el("span", { class: "pill pdone" }, "✓ All set")
   );
@@ -124,7 +127,7 @@ function paint(li, player) {
 
 function render(data) {
   const first = data.coach.split(" ")[0];
-  intro.textContent = `Hi ${first}. For each player, tap Team 1 or Team 2 for futsal games, or Out if they won't play futsal. If your team is staying together for futsal, use the "Not splitting" button to put everyone on Team 1. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
+  intro.textContent = `Hi ${first}. For each player, tap 1 or 2 for their futsal team, Both if they'll play on both, or Out if they won't play futsal. If your team is staying together for futsal, use the "Not splitting" button to put everyone on Team 1. Everything saves as you tap, so there's no submit button. You're done when every team shows ✓ All set.`;
   if (!data.teams.length) { app.replaceChildren(el("p", { class: "msg" }, "No players are assigned to your teams yet.")); return; }
   app.replaceChildren(...data.teams.map(team => {
     const tally = el("div", { class: "tally" });
@@ -140,8 +143,8 @@ function render(data) {
     team.players.forEach(p => {
       const seg = el("div", { class: "seg", role: "group", "aria-label": `Futsal team for ${p.first} ${p.last}` });
       const li = el("li", {}, el("span", { class: "name" }, `${p.first} ${p.last}`), seg);
-      OPTIONS.forEach(([side, label, cls]) => {
-        const b = el("button", { type: "button", class: cls, "data-side": side, "aria-pressed": "false" }, side === "out" ? "Out" : side === "1" ? "1" : "2");
+      OPTIONS.forEach(([side, label, cls, text]) => {
+        const b = el("button", { type: "button", class: cls, "data-side": side, "aria-pressed": "false" }, text);
         b.title = label; b.setAttribute("aria-label", label);
         b.addEventListener("click", () => setSide(team, p, side, li, tally));
         seg.append(b);
